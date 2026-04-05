@@ -15,63 +15,103 @@ class NpuSimulator:
 		print('2. data.json 분석')
 
 	#===========================================
+	#	NpuSimulator 입력 값 검증 메서드 - 공백
+	#===========================================
+	def	is_empty_space(self, value):
+		if value == '':
+			return True
+		return False
+
+	#===========================================
+	#	NpuSimulator 입력 값 검증 메서드 - 문자열
+	#===========================================
+	def	is_str(self, value):
+		try:
+			num = float(value)
+			return False
+		except ValueError:
+			return True
+
+	#===========================================
+	#	NpuSimulator 메트릭스 입력 처리 메서드
+	#===========================================		
+	def input_matrix(self):
+		matrix = []
+		while len(matrix) < 3:
+			tmp = input().split()
+			if len(tmp) != 3:
+				print('입력 형식 오류: 3개의 값만 입력 가능합니다.')
+				continue
+			valid = True
+			for j in range(3):
+				try:
+					tmp[j] = float(tmp[j])
+				except ValueError:
+					print('입력 형식 오류: 숫자만 입력 가능합니다.')
+					valid = False
+					break
+			if valid:
+				matrix.append(tmp)
+		return matrix
+
+	#===========================================
+	#	NpuSimulator MAC 계산 처리 메서드
+	#===========================================
+	def	cal_mac(self, pattern, filter_matrix):
+		score = 0.0
+		for i in range(len(pattern)):
+			for j in range(len(pattern)):
+				score += pattern[i][j] * filter_matrix[i][j]
+		return score
+
+	#===========================================
 	#	NpuSimulator 실행 메서드
 	#===========================================
 	def	run(self):
-		#메뉴 선택
-		self.showmenu()
-		raw_input = input('선택 : ').strip()
-		#입력에 대한 검증 처리
-
-
-		user_input = int(raw_input)
-		#메뉴얼 모드
-		if user_input == 1:
-			self.manual_mode()
-		#json 모드
-		elif user_input == 2:
-			self.json_mode()
+		while True:
+			#메뉴 선택
+			self.showmenu()
+			raw_input = input('선택 : ').strip()
+			#입력값 검증 처리
+			if self.is_empty_space(raw_input) == True or self.is_str(raw_input) == True:
+				print('공백 또는 숫자가 아닌 값이 입력되었습니다.')
+				continue
+			if raw_input not in ('1', '2'):
+				print('1 또는 2를 입력하세요.')
+				continue
+			user_input = int(raw_input)
+			#메뉴얼 모드
+			if user_input == 1:
+				self.manual_mode()
+			#json 모드
+			elif user_input == 2:
+				self.json_mode()
 
 	#===========================================
 	#	NpuSimulator 메뉴얼 모드 메서드
 	#===========================================
 	def	manual_mode(self):
+		#필터 입력
 		print('--------------------')
 		print('[1] 필터 입력')
 		print('--------------------')
-		#필터 입력
 		print('필터 A (3줄 입력, 공백 구분)')
-		filter_a = []
-		row_a_1 = input().split()
-		row_a_2 = input().split()
-		row_a_3 = input().split()
-		filter_a.append(row_a_1)
-		filter_a.append(row_a_2)
-		filter_a.append(row_a_3)
+		filter_a = self.input_matrix()
 		print(filter_a)
 		print('필터 B (3줄 입력, 공백 구분)')
-		filter_b = []
-		row_b_1 = input().split()
-		row_b_2 = input().split()
-		row_b_3 = input().split()
-		filter_b.append(row_b_1)
-		filter_b.append(row_b_2)
-		filter_b.append(row_b_3)
-		print(filter_b)
-
+		filter_b = self.input_matrix()
+		#패턴 입력
 		print('--------------------')
 		print('[2] 패턴 입력')
 		print('--------------------')
-		#패턴 입력
 		print('패턴 (3줄 입력, 공백 구분)')
-		pattern = []
-		row_pattern_1 = input().split()
-		row_pattern_2 = input().split()
-		row_pattern_3 = input().split()
-		pattern.append(row_pattern_1)
-		pattern.append(row_pattern_2)
-		pattern.append(row_pattern_3)
-		print(pattern)
+		pattern = self.input_matrix()
+		#MAC 연산 (Multiply Accumulate)
+		r1 = self.cal_mac(pattern, filter_a)
+		r2 = self.cal_mac(pattern, filter_b)
+		print('r1 : ', r1)
+		print('r2 : ', r2)
+		#TODO : 판정 처리
 
 	#===========================================
 	#	NpuSimulator json 모드 메서드
