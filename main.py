@@ -1,4 +1,5 @@
 import	time
+import	json
 
 class NpuSimulator:
 	#===========================================
@@ -74,13 +75,13 @@ class NpuSimulator:
 	#===========================================
 	#	NpuSimulator 결과 값 판정 처리 메서드
 	#===========================================
-	def	judge(self, score_a, score_b):
+	def	judge(self, score_a, score_b, label_a='A', label_b='B'):
 		if abs(score_a - score_b) < self.EPSILON:
-			return '판정 불가'
+			return 'UNDECIDED'
 		elif score_a > score_b:
-			return 'A'
+			return label_a
 		else:
-			return 'B'
+			return label_b
 
 	#===========================================
 	#	NpuSimulator 실행 프로파일링 처리 메서드
@@ -95,17 +96,27 @@ class NpuSimulator:
 		avg_ms = sum(times) / len(times)
 		return avg_ms
 
-
+	#===========================================
+	#	NpuSimulator json data 로드 메서드
+	#===========================================
+	def	load_json(self):
+		try:
+			with open('data_v2.json') as f:
+				data = json.load(f)
+				return data
+		except	FileNotFoundError:
+			print('data.json 파일을 찾을 수 없습니다.')
+			return None
 
 	#===========================================
 	#	NpuSimulator 실행 메서드
 	#===========================================
 	def	run(self):
 		while True:
-			#메뉴 선택
+			# 메뉴 선택
 			self.showmenu()
 			raw_input = input('선택 : ').strip()
-			#입력값 검증 처리
+			# 입력값 검증 처리
 			if self.is_empty_space(raw_input) == True or self.is_str(raw_input) == True:
 				print('공백 또는 숫자가 아닌 값이 입력되었습니다.')
 				continue
@@ -113,10 +124,10 @@ class NpuSimulator:
 				print('1 또는 2를 입력하세요.')
 				continue
 			user_input = int(raw_input)
-			#메뉴얼 모드
+			# 메뉴얼 모드
 			if user_input == 1:
 				self.manual_mode()
-			#json 모드
+			# json 모드
 			elif user_input == 2:
 				self.json_mode()
 
@@ -124,7 +135,7 @@ class NpuSimulator:
 	#	NpuSimulator 메뉴얼 모드 메서드
 	#===========================================
 	def	manual_mode(self):
-		#필터 입력
+		# 필터 입력
 		print('--------------------')
 		print('[1] 필터 입력')
 		print('--------------------')
@@ -132,20 +143,20 @@ class NpuSimulator:
 		filter_a = self.input_matrix()
 		print('필터 B (3줄 입력, 공백 구분)')
 		filter_b = self.input_matrix()
-		#패턴 입력
+		# 패턴 입력
 		print('--------------------')
 		print('[2] 패턴 입력')
 		print('--------------------')
 		print('패턴 (3줄 입력, 공백 구분)')
 		pattern = self.input_matrix()
-		#MAC 연산 (Multiply Accumulate)
+		# MAC 연산 (Multiply Accumulate)
 		r1 = self.cal_mac(pattern, filter_a)
 		r2 = self.cal_mac(pattern, filter_b)
-		#판정 처리
+		# 판정 처리
 		jud_result = self.judge(r1, r2)
-		#시간 체크
+		# 시간 체크
 		avg_result = self.profile_performance(pattern, filter_a)
-		#결과 판정
+		# 결과 판정
 		print('--------------------')
 		print('[3] MAC 결과')
 		print('--------------------')
@@ -165,8 +176,67 @@ class NpuSimulator:
 	#	NpuSimulator json 모드 메서드
 	#===========================================
 	def	json_mode(self):
-		print('json mode')
+		# 데이터 로드
+		data = self.load_json()
+		# 추출 데이터 값 가져오기
+		extracted_filters = data['filters']
+		extracted_patterns = data['patterns']
+		print('--------------------')
+		print('[1] 필터 로드')
+		print('--------------------')
+		for key in extracted_filters:
+			filter_types = list(extracted_filters[key].keys())  # ["cross", "x"]
+			print(f'✓ {key} 필터 로드 완료 ({filter_types})')
 
+		print('--------------------')
+		print('[2] 패턴 분석 (라벨 정규화 적용)')
+		print('--------------------')
+		for key in extracted_patterns:
+			try:
+				# 키 값에서 패턴의 크기 추출
+				raw_size_data = str(key)
+				tmp_list = raw_size_data.split('_')
+				parttern_size = int(tmp_list[1])
+				# 패턴 키 저장 ('size_n')
+				load_key = f'size_{parttern_size}'
+				# 필터에서 패턴값의 크기에 맞는 데이터 가져오기 
+				filter_cross = extracted_filters[load_key]['cross']
+				filter_x = extracted_filters[load_key]['x']
+				# 패턴에서 비교할 데이터 가져오기
+				pattern = extracted_patterns[key]['input']
+				# 크기 검증
+				if len(pattern) != len(filter_cross) or len(pattern) != len(filter_x):
+					print(f'{key}: FAIL (크기 불일치)')
+					continue
+				# MAC 연산
+				score_cross = self.cal_mac(pattern, filter_cross)
+				score_x = self.cal_mac(pattern, filter_x)
+				# 판정 처리
+				jud_result = self.judge(score_cross, score_x, 'Cross', 'X')
+
+				# expected 정규화
+				expected_raw = extracted_patterns[key]['expected']  # "+" 또는 "x"
+				if expected_raw == '+' or expected_raw == 'cross':
+					expected = 'Cross'
+				else:
+					expected = 'X'
+
+				# PASS/FAIL 비교
+				if jud_result == expected:
+					pass_fail = 'PASS'
+				else:
+					pass_fail = 'FAIL'
+
+				# 결과 출력
+				print(f'--- {key} ---')
+				print(f'Cross 점수: {score_cross}')
+				print(f'X 점수: {score_x}')
+				print(f'판정: {jud_result} | expected: {expected} | {pass_fail}')
+			except Exception as s:
+				continue
+		print('--------------------')
+		print('[3] 성능 분석 (평균/10회)')
+		print('--------------------')
 #===========================================
 #	NpuSimulator 실행 코드
 #===========================================
