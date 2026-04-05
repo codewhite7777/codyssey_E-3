@@ -141,8 +141,10 @@ class NpuSimulator:
 		print('--------------------')
 		print('필터 A (3줄 입력, 공백 구분)')
 		filter_a = self.input_matrix()
-		print('필터 B (3줄 입력, 공백 구분)')
+		print('✓ 필터 A 저장 완료') 
+		print('필터 B (3줄 입력, 공백 구분)') 
 		filter_b = self.input_matrix()
+		print('✓ 필터 B 저장 완료')
 		# 패턴 입력
 		print('--------------------')
 		print('[2] 패턴 입력')
@@ -172,12 +174,22 @@ class NpuSimulator:
 		print('-' * 40)
 		n = 3
 		print(f'{n}×{n:<10} {avg_result:<20.7f} {n * n}')
+
 	#===========================================
 	#	NpuSimulator json 모드 메서드
 	#===========================================
 	def	json_mode(self):
+		total = 0
+		passed = 0
+		failed = 0
+		fail_list = []
+
 		# 데이터 로드
 		data = self.load_json()
+		# 데이터 로드 실패 시, json 모드 종료
+		if data is None:
+			return
+
 		# 추출 데이터 값 가져오기
 		extracted_filters = data['filters']
 		extracted_patterns = data['patterns']
@@ -207,6 +219,9 @@ class NpuSimulator:
 				# 크기 검증
 				if len(pattern) != len(filter_cross) or len(pattern) != len(filter_x):
 					print(f'{key}: FAIL (크기 불일치)')
+					total += 1
+					failed += 1
+					fail_list.append((key, '크기 불일치'))
 					continue
 				# MAC 연산
 				score_cross = self.cal_mac(pattern, filter_cross)
@@ -221,11 +236,18 @@ class NpuSimulator:
 				else:
 					expected = 'X'
 
+				total += 1
 				# PASS/FAIL 비교
 				if jud_result == expected:
 					pass_fail = 'PASS'
+					passed += 1
 				else:
 					pass_fail = 'FAIL'
+					failed += 1
+					if jud_result == 'UNDECIDED':
+						fail_list.append((key, '동점(UNDECIDED) 처리 규칙에 따라 FAIL'))
+					else:
+						fail_list.append((key, f'판정 {jud_result} != expected {expected}'))
 
 				# 결과 출력
 				print(f'--- {key} ---')
@@ -234,9 +256,37 @@ class NpuSimulator:
 				print(f'판정: {jud_result} | expected: {expected} | {pass_fail}')
 			except Exception as s:
 				continue
+
 		print('--------------------')
 		print('[3] 성능 분석 (평균/10회)')
 		print('--------------------')
+		print('크기       평균 시간(ms)    연산 횟수')
+		print('-' * 40)
+		sizes = [3, 5, 13, 25]
+		for n in sizes:
+			if n == 3:
+				test_data = []
+				for _ in range(3):
+					row = [1, 1, 1]
+					test_data.append(row)
+			else:
+				size_key = 'size_' + str(n)
+				test_data = extracted_filters[size_key]['cross']
+			avg_ms = self.profile_performance(test_data, test_data)
+			ops = n * n
+			print(str(n) + '×' + str(n) + '    ' + str(round(avg_ms, 3)) + 'ms    ' + str(ops))
+
+		print('--------------------')
+		print('[4] 결과 요약')
+		print('--------------------')
+		print(f'총 테스트: {total}개')
+		print(f'통과: {passed}개')
+		print(f'실패: {failed}개')
+		if fail_list:
+			print(f'\n실패 케이스:')
+			for name, reason in fail_list:
+				print(f'- {name}: {reason}')
+
 #===========================================
 #	NpuSimulator 실행 코드
 #===========================================
